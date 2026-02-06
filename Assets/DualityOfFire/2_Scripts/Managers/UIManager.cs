@@ -86,8 +86,9 @@ public class UIManager : MonoBehaviour
         DisableAllPanels();
         multiplayerPanel.SetActive(true);
         Time.timeScale = 1f;
-
     }
+
+       
     public void ShowmultiplayerGamePlayPanel()
     {
         DisableAllPanels();
