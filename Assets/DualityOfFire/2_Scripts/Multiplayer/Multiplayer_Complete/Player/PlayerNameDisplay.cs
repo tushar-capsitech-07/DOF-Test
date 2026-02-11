@@ -3,18 +3,7 @@ using TMPro;
 using Unity.Collections;
 using UnityEngine;
 
-/// <summary>
-/// MULTIPLAYER - Player Name Display (Billboard)
-/// Shows player name above their character
-/// Path: Assets/Scripts/Multiplayer/Player/PlayerNameDisplay.cs
-/// 
-/// SETUP:
-/// 1. Attach to Player GameObject (same object as NetworkPlayerGun)
-/// 2. Create UI Text (TextMeshPro) as child of player
-/// 3. Position text above player sprite
-/// 4. Assign text to nameTagText field in Inspector
-/// 5. Text will always face camera (billboard effect)
-/// </summary>
+
 public class PlayerNameDisplay : NetworkBehaviour
 {
     public TMP_Text nameTagText;

@@ -2,18 +2,6 @@ using UnityEngine;
 using UnityEngine.UI;
 using Unity.Netcode;
 
-/// <summary>
-/// MULTIPLAYER - Player Gun Controller
-/// Owner controls input, server validates and syncs
-/// Path: Assets/Scripts/Multiplayer/Player/NetworkPlayerGun.cs
-/// 
-/// SETUP:
-/// 1. Attach to Player GameObject
-/// 2. Add NetworkObject component
-/// 3. Add NetworkTransform component (for movement sync)
-/// 4. Assign all fields in Inspector
-/// 5. Add to NetworkManager Prefabs List
-/// </summary>
 public class NetworkPlayerGun : NetworkGunController
 {
     [Header("Fire Settings")]

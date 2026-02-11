@@ -5116,7 +5116,7 @@ GameObject:
   - component: {fileID: 4596343249841167517}
   - component: {fileID: 7850848359160103090}
   - component: {fileID: 4277002309087661250}
-  - component: {fileID: 1919972055237555198}
+  - component: {fileID: 5710618019221954561}
   m_Layer: 6
   m_Name: NetworkPlayerBullet
   m_TagString: Bullet
@@ -5302,7 +5302,7 @@ MonoBehaviour:
   UseRigidBodyForMotion: 0
   AutoUpdateKinematicState: 1
   AutoSetKinematicOnDespawn: 1
---- !u!114 &1919972055237555198
+--- !u!114 &5710618019221954561
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -5311,13 +5311,13 @@ MonoBehaviour:
   m_GameObject: {fileID: 6046735130291419842}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 11087b77c0ab7cc4a82eb1560f7ae878, type: 3}
+  m_Script: {fileID: 11500000, guid: 9910b83295600f54698bed788956bad2, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
   ShowTopMostFoldoutHeaderGroup: 1
   speed: 10
   damage: 20
-  BulletVisual: {fileID: 4187309473968964586}
+  bulletVisual: {fileID: 4187309473968964586}
   hitParticleSystem: {fileID: 2547277963248841040}
   wallHitParticleSystem: {fileID: 4830984094060855182}
 --- !u!1001 &2897214810983332391

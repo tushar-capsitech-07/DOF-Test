@@ -3,22 +3,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using Unity.Netcode;
 
-/// <summary>
-/// MULTIPLAYER - Enemy Gun Controller
-/// Server controls AI, Player 2 controls manually
-/// Path: Assets/Scripts/Multiplayer/Enemy/NetworkEnemyGun.cs
-/// 
-/// MODES:
-/// - Player 1 Mode: AI controlled (server only)
-/// - Player 2 Mode: Player controlled (owner input)
-/// 
-/// SETUP:
-/// 1. Attach to Enemy GameObject
-/// 2. Add NetworkObject component
-/// 3. Add NetworkTransform component
-/// 4. Assign all fields in Inspector
-/// 5. Add to NetworkManager Prefabs List (if spawning dynamically)
-/// </summary>
+
 public class NetworkEnemyGun : NetworkGunController
 {
     [Header("Fire Settings")]

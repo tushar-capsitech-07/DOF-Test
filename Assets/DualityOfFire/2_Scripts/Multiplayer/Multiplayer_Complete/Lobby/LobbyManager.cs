@@ -6,32 +6,27 @@ using Unity.Collections;
 using UnityEngine.UI;
 
 /// <summary>
-/// MULTIPLAYER - Lobby Manager
-/// Manages player list, lobby UI, and game start
-/// Path: Assets/Scripts/Multiplayer/Lobby/LobbyManager.cs
+/// UNIVERSAL LOBBY MANAGER
+/// Works with universal player controller
+/// Path: Assets/Scripts/Multiplayer/LobbyManager.cs
 /// 
 /// SETUP:
-/// 1. Create GameObject in scene → Add this script
-/// 2. Create UI:
-///    - Panel for lobby
-///    - Player list container (Vertical Layout Group)
-///    - Player entry prefab (Name text + Kick button)
-///    - Start Game button
-/// 3. Assign all UI elements in Inspector
-/// 4. Make sure NetworkManager exists in scene
+/// 1. One player prefab for everyone
+/// 2. Automatic positioning (host left, client right)
+/// 3. No need for separate enemy/player prefabs
 /// </summary>
 public class LobbyManager : NetworkBehaviour
 {
     public static LobbyManager Instance;
 
     [Header("Settings")]
-    public GameObject playerPrefab;
+    public GameObject playerPrefab; // ONE prefab for all players
     public GameObject uiPanel;
     public Button startGameButton;
 
     [Header("UI List Settings")]
-    public Transform playerListContainer; // Container with Vertical Layout Group 
-    public GameObject playerEntryPrefab;  // Prefab containing Name Text and Kick Button
+    public Transform playerListContainer;
+    public GameObject playerEntryPrefab;
 
     private NetworkList<FixedString64Bytes> playerNames;
     private Dictionary<ulong, string> clientNamesMap = new Dictionary<ulong, string>();
@@ -48,7 +43,6 @@ public class LobbyManager : NetworkBehaviour
             return;
         }
 
-        // Initialize NetworkList
         playerNames = new NetworkList<FixedString64Bytes>();
     }
 
@@ -92,28 +86,24 @@ public class LobbyManager : NetworkBehaviour
         {
             clientNamesMap.Add(clientId, name);
             playerNames.Add(name);
-            Debug.Log($"✅ Player '{name}' added to lobby (ClientID: {clientId})");
+            Debug.Log($"✅ Player '{name}' joined (ID: {clientId})");
         }
     }
 
     private void UpdateStatusUI()
     {
-        // Clear existing list
         foreach (Transform child in playerListContainer)
             Destroy(child.gameObject);
 
-        // Rebuild player list
         for (int i = 0; i < playerNames.Count; i++)
         {
             GameObject entry = Instantiate(playerEntryPrefab, playerListContainer);
             string pName = playerNames[i].ToString();
 
-            // Set player name text
             var nameText = entry.GetComponentInChildren<TMP_Text>();
             if (nameText != null)
                 nameText.text = pName;
 
-            // Configure kick button
             Button kickBtn = entry.GetComponentInChildren<Button>();
             if (kickBtn != null)
             {
@@ -121,7 +111,6 @@ public class LobbyManager : NetworkBehaviour
                 {
                     ulong targetId = GetIdFromName(pName);
 
-                    // Hide kick button for host's own entry
                     if (targetId == NetworkManager.Singleton.LocalClientId)
                     {
                         kickBtn.gameObject.SetActive(false);
@@ -133,13 +122,11 @@ public class LobbyManager : NetworkBehaviour
                 }
                 else
                 {
-                    // Clients can't kick anyone
                     kickBtn.gameObject.SetActive(false);
                 }
             }
         }
 
-        // Enable start button only if enough players
         if (IsServer && startGameButton != null)
         {
             startGameButton.interactable = playerNames.Count >= 2;
@@ -153,7 +140,7 @@ public class LobbyManager : NetworkBehaviour
             if (pair.Value == name)
                 return pair.Key;
         }
-        return 999; // Invalid ID
+        return 999;
     }
 
     public void KickPlayer(ulong clientId)
@@ -162,7 +149,6 @@ public class LobbyManager : NetworkBehaviour
 
         Debug.Log($"🚫 Kicking client {clientId}");
 
-        // Notify the kicked client
         NotifyKickedClientRpc(new ClientRpcParams
         {
             Send = new ClientRpcSendParams
@@ -171,7 +157,6 @@ public class LobbyManager : NetworkBehaviour
             }
         });
 
-        // Disconnect after short delay
         StartCoroutine(DisconnectDelay(clientId));
     }
 
@@ -180,7 +165,7 @@ public class LobbyManager : NetworkBehaviour
     {
         if (LocalNetworkUI.Instance != null)
         {
-            LocalNetworkUI.Instance.ShowKickMessage("You have been kicked from the lobby!");
+            LocalNetworkUI.Instance.ShowKickMessage("You have been kicked!");
         }
     }
 
@@ -194,6 +179,53 @@ public class LobbyManager : NetworkBehaviour
         }
     }
 
+    //public void StartGame()
+    //{
+    //    if (!IsServer) return;
+
+    //    Debug.Log("🎮 Starting game...");
+
+    //    uiPanel.SetActive(false);
+    //    HideUIClientRpc();
+
+    //    // Get list of connected clients
+    //    var connectedClients = new List<ulong>(NetworkManager.Singleton.ConnectedClientsIds);
+
+    //    for (int i = 0; i < connectedClients.Count; i++)
+    //    {
+    //        ulong clientId = connectedClients[i];
+    //        GameObject playerInstance = Instantiate(playerPrefab);
+
+    //        // Set position BEFORE spawning
+    //        if (i == 0) // First player (Host) - LEFT side
+    //        {
+    //            playerInstance.transform.position = new Vector3(-5f, 0f, 0f);
+    //            Debug.Log($"👈 HOST spawning at LEFT (-5, 0)");
+    //        }
+    //        else // Second player (Client) - RIGHT side
+    //        {
+    //            playerInstance.transform.position = new Vector3(5f, 0f, 0f);
+    //            Debug.Log($"👉 CLIENT spawning at RIGHT (5, 0)");
+    //        }
+
+    //        // Spawn as network object
+    //        var netObj = playerInstance.GetComponent<NetworkObject>();
+    //        netObj.SpawnAsPlayerObject(clientId);
+
+    //        // Sync sprite facing on ALL clients
+    //        if (i == 0)
+    //        {
+    //            SetPlayerFacingClientRpc(netObj.NetworkObjectId, true); // Host faces RIGHT
+    //        }
+    //        else
+    //        {
+    //            SetPlayerFacingClientRpc(netObj.NetworkObjectId, false); // Client faces LEFT
+    //        }
+
+    //        Debug.Log($"✅ Player {i} (ClientId: {clientId}) spawned successfully");
+    //    }
+    //}
+
     public void StartGame()
     {
         if (!IsServer) return;
@@ -203,23 +235,57 @@ public class LobbyManager : NetworkBehaviour
         uiPanel.SetActive(false);
         HideUIClientRpc();
 
-        // Spawn player for each connected client
-        foreach (ulong clientId in NetworkManager.Singleton.ConnectedClientsIds)
-        {
-            GameObject playerInstance = Instantiate(playerPrefab);
-            playerInstance.GetComponent<NetworkObject>().SpawnAsPlayerObject(clientId);
+        // Get list of connected clients
+        var connectedClients = new List<ulong>(NetworkManager.Singleton.ConnectedClientsIds);
 
-            // Set player name if available
-            if (clientNamesMap.TryGetValue(clientId, out string name))
+        for (int i = 0; i < connectedClients.Count; i++)
+        {
+            ulong clientId = connectedClients[i];
+            GameObject playerInstance = Instantiate(playerPrefab);
+
+            // Set position BEFORE spawning
+            if (i == 0) // First player (Host) - LEFT side
             {
-                var nameDisplay = playerInstance.GetComponent<PlayerNameDisplay>();
-                if (nameDisplay != null)
-                {
-                    nameDisplay.SetPlayerName(name);
-                }
+                playerInstance.transform.position = new Vector3(-5f, -2f, 0f); // Adjust Y as needed
+                playerInstance.transform.rotation = Quaternion.identity;
+                Debug.Log($"👈 HOST gun spawning at LEFT (-5, -2)");
+            }
+            else // Second player (Client) - RIGHT side
+            {
+                playerInstance.transform.position = new Vector3(5f, -2f, 0f); // Adjust Y as needed
+                playerInstance.transform.rotation = Quaternion.identity;
+                Debug.Log($"👉 CLIENT gun spawning at RIGHT (5, -2)");
             }
 
-            Debug.Log($"✅ Spawned player for client {clientId}");
+            // Spawn as network object
+            var netObj = playerInstance.GetComponent<NetworkObject>();
+            netObj.SpawnAsPlayerObject(clientId);
+
+            // Sync sprite facing on ALL clients
+            if (i == 0)
+            {
+                SetPlayerFacingClientRpc(netObj.NetworkObjectId, true); // Host faces RIGHT
+            }
+            else
+            {
+                SetPlayerFacingClientRpc(netObj.NetworkObjectId, false); // Client faces LEFT
+            }
+
+            Debug.Log($"✅ Player {i} (ClientId: {clientId}) spawned successfully");
+        }
+    }
+
+    [ClientRpc]
+    private void SetPlayerFacingClientRpc(ulong networkObjectId, bool faceRight)
+    {
+        // Find the player by NetworkObjectId
+        if (NetworkManager.Singleton.SpawnManager.SpawnedObjects.TryGetValue(networkObjectId, out NetworkObject netObj))
+        {
+            Vector3 scale = netObj.transform.localScale;
+            scale.x = faceRight ? Mathf.Abs(scale.x) : -Mathf.Abs(scale.x);
+            netObj.transform.localScale = scale;
+
+            Debug.Log($"🎨 Set sprite facing: {(faceRight ? "RIGHT →" : "LEFT ←")} for NetworkObject {networkObjectId}");
         }
     }
 

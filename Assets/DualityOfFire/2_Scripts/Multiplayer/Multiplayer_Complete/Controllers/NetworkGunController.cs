@@ -2,11 +2,7 @@
 using Unity.Netcode;
 using System;
 
-/// <summary>
-/// MULTIPLAYER - Base Gun Controller
-/// Server-authoritative shooting system
-/// Path: Assets/Scripts/Multiplayer/Controllers/NetworkGunController.cs
-/// </summary>
+
 public abstract class NetworkGunController : NetworkBehaviour
 {
     [Header("References")]
