@@ -233,8 +233,8 @@ GameObject:
   - component: {fileID: 3219911194236942432}
   - component: {fileID: 6865734536303346282}
   - component: {fileID: 3324517027709390150}
-  - component: {fileID: 31981595548335816}
   - component: {fileID: 7257854556910303239}
+  - component: {fileID: 1932683754311796212}
   m_Layer: 6
   m_Name: Network PlayerPrefab
   m_TagString: Player
@@ -258,6 +258,7 @@ Transform:
   - {fileID: 6501458853077973994}
   - {fileID: 3936396299619926276}
   - {fileID: 9145421805973572214}
+  - {fileID: 2100988934643455531}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!60 &4989251419234813069
@@ -489,7 +490,7 @@ Rigidbody2D:
   m_Mass: 1
   m_LinearDamping: 0
   m_AngularDamping: 0.05
-  m_GravityScale: 1
+  m_GravityScale: 0.2
   m_Material: {fileID: 0}
   m_IncludeLayers:
     serializedVersion: 2
@@ -501,23 +502,6 @@ Rigidbody2D:
   m_SleepingMode: 1
   m_CollisionDetection: 0
   m_Constraints: 0
---- !u!114 &31981595548335816
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 801905422963075028}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 80d7c879794dfda4687da0e400131852, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  ShowTopMostFoldoutHeaderGroup: 1
-  NetworkRigidbodyBaseExpanded: 0
-  UseRigidBodyForMotion: 0
-  AutoUpdateKinematicState: 1
-  AutoSetKinematicOnDespawn: 1
 --- !u!61 &7257854556910303239
 BoxCollider2D:
   m_ObjectHideFlags: 0
@@ -564,6 +548,23 @@ BoxCollider2D:
   m_AutoTiling: 0
   m_Size: {x: 4.5745735, y: 2.8304384}
   m_EdgeRadius: 0
+--- !u!114 &1932683754311796212
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 801905422963075028}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 80d7c879794dfda4687da0e400131852, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  ShowTopMostFoldoutHeaderGroup: 1
+  NetworkRigidbodyBaseExpanded: 0
+  UseRigidBodyForMotion: 0
+  AutoUpdateKinematicState: 1
+  AutoSetKinematicOnDespawn: 1
 --- !u!1 &950097813004213335
 GameObject:
   m_ObjectHideFlags: 0
@@ -10309,15 +10310,19 @@ MonoBehaviour:
   ShowTopMostFoldoutHeaderGroup: 1
   bulletPrefab: {fileID: 6046735130291419842, guid: f17a1f60c8694f24ca94bd40be65a0d8, type: 3}
   firePoint: {fileID: 3209969316532230901}
+  gunPivot: {fileID: 6029156849714044575}
   forcePoint: {fileID: 6029156849714044575}
   fireCooldown: 0.25
-  recoilForce: 2
+  recoilForce: 2.2
+  jumpForce: 5
   torqueForce: 0.25
+  maxGunRotation: 15
+  gunReturnSpeed: 8
   maxHealth: 100
   healthBar: {fileID: 0}
   shootParticle: {fileID: 2534715395260708625}
   destroyParticle: {fileID: 8002304800437092719}
-  audioSources: {fileID: 503238704850871745}
+  audioSource: {fileID: 0}
   audioShootClips: []
 --- !u!1 &3507073312147664158
 GameObject:
@@ -10495,6 +10500,37 @@ MonoBehaviour:
   m_hasFontAssetChanged: 0
   m_renderer: {fileID: 9180684371525926309}
   m_maskType: 0
+--- !u!1 &5220324317514209270
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2100988934643455531}
+  m_Layer: 0
+  m_Name: GameObject
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &2100988934643455531
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5220324317514209270}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: -0.04915634, y: -0.80634713, z: 0.27157164}
+  m_LocalScale: {x: 3.333333, y: 3.333333, z: 3.333333}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 2693272095284560657}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &6995961354851999507
 GameObject:
   m_ObjectHideFlags: 0

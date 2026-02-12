@@ -1,36 +1,36 @@
 ﻿using UnityEngine;
 using UnityEngine.UI;
 using Unity.Netcode;
-using System;
+using System.Collections;
 
 /// <summary>
 /// UNIVERSAL MULTIPLAYER PLAYER CONTROLLER
-/// Works for BOTH Host and Client
-/// Automatically detects which side to be on and who is enemy
-/// Path: Assets/Scripts/Multiplayer/NetworkPlayerController.cs
 /// 
-/// SETUP:
-/// 1. Create ONE player prefab
-/// 2. Attach this script
-/// 3. Add NetworkObject + NetworkTransform
-/// 4. Assign bullet prefab (same for everyone)
-/// 5. Add to NetworkManager Prefabs List
-/// 6. Done! Use same prefab for all players
+/// ✅ GUN SPIN RECOIL – rotates the gun pivot when shooting
+/// ✅ JUMP RECOIL – adds vertical impulse
+/// ✅ TORQUE – whole player spins (optional)
+/// ✅ ALL EFFECTS SYNCED – both phones see the same thing
 /// </summary>
 public class NetworkPlayerController : NetworkBehaviour
 {
     [Header("References")]
     [SerializeField] private GameObject bulletPrefab;
-    [SerializeField] private Transform firePoint;
-    [SerializeField] private Transform forcePoint;
+    [SerializeField] private Transform firePoint;      // Where bullets come from
+    [SerializeField] private Transform gunPivot;       // The gun sprite that should spin (assign this!)
+    [SerializeField] private Transform forcePoint;     // Where recoil force is applied
 
     [Header("Fire Settings")]
     [SerializeField] private float fireCooldown = 0.25f;
     private float nextFireTime;
 
     [Header("Recoil")]
-    [SerializeField] private float recoilForce = 2f;
-    [SerializeField] private float torqueForce = 0.25f;
+    [SerializeField] private float recoilForce = 2f;       // Backward push
+    [SerializeField] private float jumpForce = 1.5f;       // Upward push (jumping)
+    [SerializeField] private float torqueForce = 1.5f;     // Body spin (set 0 to disable)
+
+    [Header("Gun Spin Recoil")]
+    [SerializeField] private float maxGunRotation = 15f;   // How far the gun rotates back
+    [SerializeField] private float gunReturnSpeed = 8f;    // How fast it returns
 
     [Header("Health Settings")]
     [SerializeField] private int maxHealth = 100;
@@ -41,10 +41,10 @@ public class NetworkPlayerController : NetworkBehaviour
     [SerializeField] private ParticleSystem destroyParticle;
 
     [Header("Shoot Sound Effect")]
-    [SerializeField] private AudioSource audioSources;
+    [SerializeField] private AudioSource audioSource;
     [SerializeField] private AudioClip[] audioShootClips;
 
-    // Network synced health
+    // Network health
     private NetworkVariable<int> currentHealth = new NetworkVariable<int>(
         100,
         NetworkVariableReadPermission.Everyone,
@@ -53,18 +53,23 @@ public class NetworkPlayerController : NetworkBehaviour
 
     private Rigidbody2D rb;
     private bool isDead = false;
-    private int shootDirection = 1; // 1 for right, -1 for left
+    private int shootDirection = 1; // 1 = right, -1 = left
+
+    // Gun spin state (local only, for smooth return)
+    private float currentGunRotation = 0f;
+    private Quaternion originalGunRotation;
 
     protected virtual void Awake()
     {
         rb = GetComponent<Rigidbody2D>();
+        if (gunPivot != null)
+            originalGunRotation = gunPivot.localRotation;
     }
 
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
 
-        // Initialize health
         if (IsServer)
         {
             currentHealth.Value = maxHealth;
@@ -72,21 +77,17 @@ public class NetworkPlayerController : NetworkBehaviour
 
         currentHealth.OnValueChanged += OnHealthChanged;
 
-        // Determine shoot direction based on which side we're on
-        // If we're on the left (x < 0), shoot right
-        // If we're on the right (x > 0), shoot left
-        if (transform.position.x < 0)
-        {
-            shootDirection = 1; // Shoot RIGHT
-            Debug.Log($"🎯 Player at x={transform.position.x} will shoot RIGHT");
-        }
-        else
-        {
-            shootDirection = -1; // Shoot LEFT
-            Debug.Log($"🎯 Player at x={transform.position.x} will shoot LEFT");
-        }
+        // Determine shoot direction AFTER position is final
+        StartCoroutine(SetShootDirectionAfterSpawn());
 
         UpdateHealthBar();
+    }
+
+    private IEnumerator SetShootDirectionAfterSpawn()
+    {
+        yield return null;
+        shootDirection = transform.position.x < 0 ? 1 : -1;
+        Debug.Log($"🎯 Player at {transform.position.x} → shootDirection = {shootDirection}");
     }
 
     public override void OnNetworkDespawn()
@@ -102,11 +103,17 @@ public class NetworkPlayerController : NetworkBehaviour
 
     void Update()
     {
-        // Only owner controls this player
         if (!IsOwner) return;
         if (isDead) return;
 
         HandleInput();
+
+        // Smoothly return gun to original rotation (local effect)
+        if (gunPivot != null && currentGunRotation != 0f)
+        {
+            currentGunRotation = Mathf.Lerp(currentGunRotation, 0f, Time.deltaTime * gunReturnSpeed);
+            gunPivot.localRotation = originalGunRotation * Quaternion.Euler(0, 0, currentGunRotation);
+        }
     }
 
     void HandleInput()
@@ -115,22 +122,16 @@ public class NetworkPlayerController : NetworkBehaviour
 
         bool shouldShoot = false;
 
-        // Editor testing with mouse
 #if UNITY_EDITOR
         if (Input.GetMouseButtonDown(0))
-        {
             shouldShoot = true;
-        }
 #endif
 
-        // Touch input for mobile
         if (Input.touchCount > 0)
         {
             Touch touch = Input.GetTouch(0);
             if (touch.phase == TouchPhase.Began)
-            {
                 shouldShoot = true;
-            }
         }
 
         if (shouldShoot)
@@ -142,20 +143,7 @@ public class NetworkPlayerController : NetworkBehaviour
 
     void Shoot()
     {
-        // Check if network is ready
-        if (NetworkManager.Singleton == null || !NetworkManager.Singleton.IsListening)
-        {
-            Debug.LogWarning("⚠️ Network not ready!");
-            return;
-        }
-
-        if (!IsSpawned)
-        {
-            Debug.LogWarning("⚠️ Not spawned yet!");
-            return;
-        }
-
-        // Request server to shoot
+        if (!IsSpawned) return;
         ShootServerRpc(shootDirection);
     }
 
@@ -170,8 +158,8 @@ public class NetworkPlayerController : NetworkBehaviour
 
         // Spawn bullet
         GameObject bullet = Instantiate(bulletPrefab, firePoint.position, firePoint.rotation);
+        NetworkObject netObj = bullet.GetComponent<NetworkObject>();
 
-        var netObj = bullet.GetComponent<NetworkObject>();
         if (netObj == null)
         {
             Debug.LogError("❌ Bullet missing NetworkObject!");
@@ -179,7 +167,6 @@ public class NetworkPlayerController : NetworkBehaviour
             return;
         }
 
-        // Initialize bullet with shooter info
         var bulletScript = bullet.GetComponent<NetworkBullet>();
         if (bulletScript != null)
         {
@@ -189,35 +176,47 @@ public class NetworkPlayerController : NetworkBehaviour
 
         netObj.Spawn();
 
-        // Play effects on all clients
+        // ===== TRIGGER EFFECTS ON ALL CLIENTS =====
         PlayShootEffectsClientRpc(direction);
     }
 
     [ClientRpc]
     void PlayShootEffectsClientRpc(int direction)
     {
-        // Particle
-        if (shootParticle != null)
-            shootParticle.Play();
+        // --- PARTICLE ---
+        if (shootParticle != null) shootParticle.Play();
 
-        // Sound
-        if (audioSources != null && audioShootClips != null && audioShootClips.Length > 0)
+        // --- SOUND ---
+        if (audioSource != null && audioShootClips.Length > 0)
         {
-            audioSources.clip = audioShootClips[UnityEngine.Random.Range(0, audioShootClips.Length)];
-            audioSources.Play();
+            audioSource.clip = audioShootClips[Random.Range(0, audioShootClips.Length)];
+            audioSource.Play();
         }
 
-        // Recoil
-        if (rb != null && firePoint != null)
+        // --- PHYSICS RECOIL (Body) ---
+        if (rb != null)
         {
+            // Backward push
             Vector2 recoilDir = direction > 0 ? Vector2.left : Vector2.right;
-            rb.AddForce(recoilDir * recoilForce * 0.15f, ForceMode2D.Impulse);
-            rb.AddForce(forcePoint.up * recoilForce * 0.75f, ForceMode2D.Impulse);
-            rb.AddTorque(torqueForce * direction, ForceMode2D.Impulse);
+            rb.AddForce(recoilDir * recoilForce, ForceMode2D.Impulse);
+
+            // 🦘 JUMP (vertical recoil)
+            rb.AddForce(Vector2.up * jumpForce, ForceMode2D.Impulse);
+
+            // 🌀 BODY SPIN (torque)
+            rb.AddTorque(torqueForce * -direction, ForceMode2D.Impulse);
+        }
+
+        // --- 🔫 GUN SPIN RECOIL (Visual) ---
+        if (gunPivot != null)
+        {
+            // Rotate gun upward (negative direction for left, positive for right?)
+            float rotationAmount = -maxGunRotation; // always rotate "up" (counter-clockwise)
+            currentGunRotation = rotationAmount;
+            gunPivot.localRotation = originalGunRotation * Quaternion.Euler(0, 0, rotationAmount);
         }
     }
 
-    // Server-only damage
     public void TakeDamage(int damage)
     {
         if (!IsServer) return;
@@ -229,19 +228,13 @@ public class NetworkPlayerController : NetworkBehaviour
     private void OnHealthChanged(int oldHealth, int newHealth)
     {
         UpdateHealthBar();
-
-        if (newHealth <= 0 && !isDead)
-        {
-            Die();
-        }
+        if (newHealth <= 0 && !isDead) Die();
     }
 
     void UpdateHealthBar()
     {
         if (healthBar != null)
-        {
             healthBar.fillAmount = (float)currentHealth.Value / maxHealth;
-        }
     }
 
     void Die()
@@ -251,33 +244,24 @@ public class NetworkPlayerController : NetworkBehaviour
 
         PlayDeathEffectsClientRpc();
 
-        // Show game over for owner
         if (IsOwner)
         {
-            if (UIManager.Instance != null)
-                UIManager.Instance.ShowGameOverWithDelay();
+            if (UIManager.Instance != null) UIManager.Instance.ShowGameOverWithDelay();
         }
-        // Show win for opponent
         else if (IsServer)
         {
-            if (UIManager.Instance != null)
-                UIManager.Instance.ShowWinWithDelay();
+            if (UIManager.Instance != null) UIManager.Instance.ShowWinWithDelay();
         }
     }
 
     [ClientRpc]
     private void PlayDeathEffectsClientRpc()
     {
-        var spriteRenderer = GetComponent<SpriteRenderer>();
-        if (spriteRenderer != null)
-            spriteRenderer.enabled = false;
+        var sr = GetComponent<SpriteRenderer>();
+        if (sr != null) sr.enabled = false;
 
-        if (destroyParticle != null)
-            destroyParticle.Play();
+        if (destroyParticle != null) destroyParticle.Play();
 
-        if (IsServer)
-        {
-            Destroy(gameObject, 1f);
-        }
+        if (IsServer) Destroy(gameObject, 1f);
     }
 }
