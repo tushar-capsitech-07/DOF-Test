@@ -37,7 +37,7 @@ public class DiscoveryHandler : MonoBehaviour
             }
             catch (Exception e)
             {
-                Debug.LogWarning($"📡 Broadcast notice: {e.Message}");
+                Debug.LogWarning($"Broadcast notice: {e.Message}");
             }
             yield return new WaitForSeconds(2f);
         }
@@ -60,7 +60,7 @@ public class DiscoveryHandler : MonoBehaviour
             listener.Client.Bind(new IPEndPoint(IPAddress.Any, discoveryPort));
             listener.Client.Blocking = false;
 
-            Debug.Log($"👂 Listening on port {discoveryPort}");
+            Debug.Log($"Listening on port {discoveryPort}");
 
             while (true)
             {
@@ -94,7 +94,7 @@ public class DiscoveryHandler : MonoBehaviour
             if (listener != null)
             {
                 listener.Close();
-                Debug.Log("🔇 Listener Closed");
+                Debug.Log("Listener Closed");
             }
         }
     }

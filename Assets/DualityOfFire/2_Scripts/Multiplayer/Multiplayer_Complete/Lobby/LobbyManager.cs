@@ -6,14 +6,6 @@ using Unity.Collections;
 using UnityEngine.UI;
 using System.Collections;
 
-/// <summary>
-/// UNIVERSAL LOBBY MANAGER
-/// Works with the universal player controller.
-/// 
-/// ✅ Host spawns at (1.5, -2) facing LEFT
-/// ✅ Client spawns at (-1.5, -2) facing RIGHT
-/// ✅ Players look at each other, bullets fly correctly.
-/// </summary>
 public class LobbyManager : NetworkBehaviour
 {
     public static LobbyManager Instance;
@@ -85,7 +77,7 @@ public class LobbyManager : NetworkBehaviour
         {
             clientNamesMap.Add(clientId, name);
             playerNames.Add(name);
-            Debug.Log($"✅ Player '{name}' joined (ID: {clientId})");
+            Debug.Log($"Player '{name}' joined (ID: {clientId})");
         }
     }
 
@@ -141,7 +133,7 @@ public class LobbyManager : NetworkBehaviour
     {
         if (!IsServer) return;
 
-        Debug.Log($"🚫 Kicking client {clientId}");
+        Debug.Log($" Kicking client {clientId}");
 
         NotifyKickedClientRpc(new ClientRpcParams
         {
@@ -174,8 +166,6 @@ public class LobbyManager : NetworkBehaviour
     {
         if (!IsServer) return;
 
-        Debug.Log("🎮 Starting game...");
-
         uiPanel.SetActive(false);
         HideUIClientRpc();
 
@@ -186,31 +176,30 @@ public class LobbyManager : NetworkBehaviour
             ulong clientId = clients[i];
             GameObject player = Instantiate(playerPrefab);
 
-            // ---------- POSITION ----------
-            if (i == 0) // Host → RIGHT (1.5, -2)
+            Vector3 spawnPos;
+            Quaternion spawnRot = Quaternion.identity;
+            Vector3 localScale = player.transform.localScale;
+
+            if (i == 0)
             {
-                player.transform.position = new Vector3(1f, -2f, 0f);
-                Debug.Log($"👑 HOST spawning at RIGHT (1.5, -2)");
+                spawnPos = new Vector3(-3f, -2f, 0f);
+                spawnRot = Quaternion.identity; 
+                localScale.x = Mathf.Abs(localScale.x); 
             }
-            else // Client → LEFT (-1.5, -2)
+            else
             {
-                player.transform.position = new Vector3(-1f, -2f, 0f);
-                Debug.Log($"👤 CLIENT spawning at LEFT (-1.5, -2)");
+                spawnPos = new Vector3(3f, -2f, 0f);
+                spawnRot = Quaternion.identity;
+                localScale.x = -Mathf.Abs(localScale.x); 
             }
 
-            // ---------- FACING (flip sprite) ----------
-            Vector3 localScale = player.transform.localScale;
-            if (i == 0) // Host faces LEFT (toward client)
-                localScale.x = -Mathf.Abs(localScale.x);
-            else        // Client faces RIGHT (toward host)
-                localScale.x = Mathf.Abs(localScale.x);
+            player.transform.position = spawnPos;
+            player.transform.rotation = spawnRot;
             player.transform.localScale = localScale;
 
-            // ---------- SPAWN ----------
+            // Spawn with ownership
             NetworkObject netObj = player.GetComponent<NetworkObject>();
             netObj.SpawnAsPlayerObject(clientId);
-
-            Debug.Log($"✅ Player {i} (ClientId: {clientId}) spawned at {player.transform.position} facing {(i == 0 ? "LEFT" : "RIGHT")}");
         }
     }
 

@@ -3,23 +3,6 @@ using Unity.Netcode;
 using Unity.Netcode.Transports.UTP;
 using TMPro;
 
-/// <summary>
-/// MULTIPLAYER - Local Network UI Handler
-/// Manages Host/Client connection UI
-/// Path: Assets/Scripts/Multiplayer/UI/LocalNetworkUI.cs
-/// 
-/// SETUP:
-/// 1. Create UI Canvas with:
-///    - Name Input Field
-///    - Join Code Input Field
-///    - Host Button
-///    - Client/Join Button
-///    - Status Text
-///    - Host Code Display Text
-/// 2. Assign all UI elements in Inspector
-/// 3. Make sure DiscoveryHandler is in scene
-/// 4. Make sure NetworkManager has UnityTransport component
-/// </summary>
 public class LocalNetworkUI : MonoBehaviour
 {
     public static LocalNetworkUI Instance;
@@ -95,10 +78,10 @@ public class LocalNetworkUI : MonoBehaviour
         if (string.IsNullOrEmpty(hostIP) || hostIP == "127.0.0.1")
         {
             hostIP = "192.168.43.1"; // Default mobile hotspot IP
-            Debug.LogWarning("⚠️ Using default hotspot IP: " + hostIP);
+            Debug.LogWarning("Using default hotspot IP: " + hostIP);
         }
 
-        Debug.Log($"🌐 Starting host on IP: {hostIP}");
+        Debug.Log($"Starting host on IP: {hostIP}");
 
         // Configure transport
         if (transport != null)
@@ -140,7 +123,7 @@ public class LocalNetworkUI : MonoBehaviour
             return;
         }
 
-        Debug.Log($"🔌 Connecting to: {joinCodeInput.text}");
+        Debug.Log($"Connecting to: {joinCodeInput.text}");
 
         // Configure transport
         if (transport != null)
@@ -199,7 +182,7 @@ public class LocalNetworkUI : MonoBehaviour
             if (LobbyManager.Instance != null && !string.IsNullOrEmpty(nameInput.text))
             {
                 LobbyManager.Instance.AddPlayerNameServerRpc(nameInput.text);
-                Debug.Log($"✅ Connected as: {nameInput.text}");
+                Debug.Log($"Connected as: {nameInput.text}");
             }
         }
     }

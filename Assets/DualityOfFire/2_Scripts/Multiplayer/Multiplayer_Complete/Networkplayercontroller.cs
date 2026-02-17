@@ -15,11 +15,10 @@ public class NetworkPlayerController : NetworkBehaviour
     [SerializeField] private float fireCooldown = 0.25f;
     private float nextFireTime;
 
-    [Header("Recoil Forces (Increased for Mobile)")]
-    // ফোর্সের মান বাড়িয়ে দেওয়া হয়েছে যাতে মোবাইলে এফেক্ট বোঝা যায়
+    [Header("Recoil Forces")]
     [SerializeField] private float recoilForce = 20f;
     [SerializeField] private float jumpForce = 15f;
-    [SerializeField] private float torqueForce = 10f; // Spin force
+    [SerializeField] private float torqueForce = 10f;
 
     [Header("Gun Spin Recoil (Visual Only)")]
     [SerializeField] private float maxGunRotation = 30f;
@@ -37,47 +36,98 @@ public class NetworkPlayerController : NetworkBehaviour
     [SerializeField] private AudioSource audioSource;
     [SerializeField] private AudioClip[] audioShootClips;
 
-    // Custom Sync for Rotation (রোটেশন ম্যানুয়ালি সিঙ্ক করার ভেরিয়েবল)
+  
+    private NetworkVariable<int> netShootDirection = new NetworkVariable<int>(
+        1,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server
+    );
+
     private NetworkVariable<float> netRotationZ = new NetworkVariable<float>(
-        0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server
+        0,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server
     );
 
     private NetworkVariable<int> currentHealth = new NetworkVariable<int>(
-        100, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server
+        100,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server
     );
 
     private Rigidbody2D rb;
     private bool isDead = false;
-    private int shootDirection = 1;
 
     // Gun spin state
     private float currentGunRotation = 0f;
     private Quaternion originalGunRotation;
 
+    public Collider2D OwnCollider { get; private set; }
+
     protected virtual void Awake()
     {
         rb = GetComponent<Rigidbody2D>();
         if (gunPivot != null) originalGunRotation = gunPivot.localRotation;
+        OwnCollider = GetComponent<Collider2D>();
     }
 
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
-        if (IsServer) currentHealth.Value = maxHealth;
+
+        if (IsServer)
+        {
+            currentHealth.Value = maxHealth;
+
+            StartCoroutine(SetShootDirectionOnServer());
+        }
+
         currentHealth.OnValueChanged += OnHealthChanged;
-        StartCoroutine(SetShootDirectionAfterSpawn());
+
+        netShootDirection.OnValueChanged += OnShootDirectionChanged;
+
         UpdateHealthBar();
     }
 
-    private IEnumerator SetShootDirectionAfterSpawn()
+    private IEnumerator SetShootDirectionOnServer()
     {
-        yield return null;
-        shootDirection = transform.position.x < 0 ? 1 : -1;
+        yield return new WaitForSeconds(0.1f);
+
+        int direction;
+        if (transform.position.x < 0)
+        {
+            direction = 1;
+        }
+        else
+        {
+            direction = -1;
+        }
+
+        netShootDirection.Value = direction;
+        Debug.Log($"Player {OwnerClientId} spawn pos X={transform.position.x:F1} → shootDir={direction}");
+
+        UpdateFirePointOrientation(direction);
+    }
+
+    private void OnShootDirectionChanged(int oldDir, int newDir)
+    {
+        UpdateFirePointOrientation(newDir);
+    }
+
+    private void UpdateFirePointOrientation(int direction)
+    {
+        if (firePoint == null) return;
+
+        if (direction > 0)
+            firePoint.localRotation = Quaternion.identity;        
+        else
+            firePoint.localRotation = Quaternion.Euler(0f, 180f, 0f); 
     }
 
     public override void OnNetworkDespawn()
     {
         currentHealth.OnValueChanged -= OnHealthChanged;
+        netShootDirection.OnValueChanged -= OnShootDirectionChanged;
         base.OnNetworkDespawn();
     }
 
@@ -94,26 +144,22 @@ public class NetworkPlayerController : NetworkBehaviour
             HandleInput();
         }
 
-        // 2. ROTATION SYNC (Manual Fix)
-        // যদি NetworkTransform কাজ না করে, এই কোডটি ক্লায়েন্টকে জোর করে ঘোরাবে
+        // 2. ROTATION SYNC
         if (IsServer)
         {
-            // সার্ভার তার বর্তমান রোটেশন ভেরিয়েবলে আপডেট করবে
             netRotationZ.Value = transform.eulerAngles.z;
         }
         else
         {
-            // ক্লায়েন্ট সেই ভেরিয়েবল পড়ে নিজেকে ঘোরাবে (Smoothly)
             float syncedZ = netRotationZ.Value;
             float currentZ = transform.eulerAngles.z;
             float newZ = Mathf.LerpAngle(currentZ, syncedZ, Time.deltaTime * 10f);
 
-            // ফিজিক্সের সাথে যাতে সমস্যা না হয়, তাই শুধু ভিজ্যুয়াল রোটেশন আপডেট করছি
             if (rb.bodyType == RigidbodyType2D.Kinematic || !IsOwner)
                 transform.rotation = Quaternion.Euler(0, 0, newZ);
         }
 
-        // 3. GUN ANIMATION (All Clients)
+        // 3. GUN ANIMATION
         if (gunPivot != null && Mathf.Abs(currentGunRotation) > 0.1f)
         {
             currentGunRotation = Mathf.Lerp(currentGunRotation, 0f, Time.deltaTime * gunReturnSpeed);
@@ -133,7 +179,7 @@ public class NetworkPlayerController : NetworkBehaviour
 
         if (shouldShoot)
         {
-            ShootServerRpc(shootDirection);
+            ShootServerRpc(netShootDirection.Value);
             nextFireTime = Time.time + fireCooldown;
         }
     }
@@ -143,7 +189,6 @@ public class NetworkPlayerController : NetworkBehaviour
     {
         if (isDead) return;
 
-        // Spawn Bullet
         if (bulletPrefab != null && firePoint != null)
         {
             GameObject bullet = Instantiate(bulletPrefab, firePoint.position, firePoint.rotation);
@@ -151,19 +196,20 @@ public class NetworkPlayerController : NetworkBehaviour
             if (netObj != null)
             {
                 var bScript = bullet.GetComponent<NetworkBullet>();
-                if (bScript != null) bScript.Initialize(OwnerClientId, direction > 0 ? Vector2.right : Vector2.left);
+                if (bScript != null)
+                {
+                    Vector2 bulletDir = (Vector2)firePoint.right;
+                    bScript.Initialize(OwnerClientId, bulletDir, OwnCollider);
+                }
                 netObj.Spawn();
             }
         }
 
-        // Apply Physics
         if (rb != null)
         {
-            Vector2 recoilDir = direction > 0 ? Vector2.left : Vector2.right;
+            Vector2 recoilDir = -(Vector2)firePoint.right;
             rb.AddForce(recoilDir * recoilForce, ForceMode2D.Impulse);
             rb.AddForce(Vector2.up * jumpForce, ForceMode2D.Impulse);
-
-            // Add Torque (Spin)
             rb.AddTorque(torqueForce * -direction, ForceMode2D.Impulse);
         }
 
@@ -188,7 +234,6 @@ public class NetworkPlayerController : NetworkBehaviour
         }
     }
 
-    // Health & Death Logic...
     public void TakeDamage(int damage)
     {
         if (!IsServer || isDead) return;

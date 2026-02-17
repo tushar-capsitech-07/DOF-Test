@@ -2,28 +2,9 @@
 using System.Net.Sockets;
 using UnityEngine;
 
-/// <summary>
-/// MULTIPLAYER - Local IP Address Finder
-/// Finds device's local IPv4 address for hosting
-/// Path: Assets/Scripts/Multiplayer/Network/LocalIPFinder.cs
-/// 
-/// HOW IT WORKS:
-/// - Scans all network interfaces
-/// - Finds active WiFi/Ethernet adapter
-/// - Returns private IP address (192.x, 172.x, or 10.x)
-/// - Fallback to 127.0.0.1 if no network found
-/// 
-/// USAGE:
-/// string ip = LocalIPFinder.GetLocalIPv4();
-/// 
-/// NO SETUP NEEDED - Just call the static method
-/// </summary>
+
 public static class LocalIPFinder
 {
-    /// <summary>
-    /// Get the local IPv4 address of this device
-    /// </summary>
-    /// <returns>Local IP address or 127.0.0.1 if not found</returns>
     public static string GetLocalIPv4()
     {
         try
@@ -46,10 +27,6 @@ public static class LocalIPFinder
                     {
                         string ipAddr = ip.Address.ToString();
 
-                        // Check for private IP ranges
-                        // 192.168.x.x - Most common WiFi
-                        // 10.x.x.x - Some corporate/home networks
-                        // 172.16-31.x.x - Some networks
                         if (ipAddr.StartsWith("192.168.") ||
                             ipAddr.StartsWith("10.") ||
                             ipAddr.StartsWith("172.16.") ||
@@ -78,32 +55,26 @@ public static class LocalIPFinder
         }
         catch (System.Exception e)
         {
-            Debug.LogError($"❌ Error finding local IP: {e.Message}");
+            Debug.LogError($"Error finding local IP: {e.Message}");
         }
 
-        Debug.LogWarning("⚠️ No local IP found, using localhost");
+        Debug.LogWarning("No local IP found, using localhost");
         return "127.0.0.1";  // Fallback to localhost
     }
 
-    /// <summary>
-    /// Check if device has an active network connection
-    /// </summary>
     public static bool HasNetworkConnection()
     {
         string ip = GetLocalIPv4();
         return ip != "127.0.0.1";
     }
 
-    /// <summary>
-    /// Get all available IPs (for debugging)
-    /// </summary>
     public static void DebugPrintAllIPs()
     {
         Debug.Log("=== All Network Interfaces ===");
 
         foreach (NetworkInterface ni in NetworkInterface.GetAllNetworkInterfaces())
         {
-            Debug.Log($"Interface: {ni.Name}");
+            Debug.Log($"  Interface: {ni.Name}");
             Debug.Log($"  Type: {ni.NetworkInterfaceType}");
             Debug.Log($"  Status: {ni.OperationalStatus}");
 

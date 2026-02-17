@@ -1,18 +1,6 @@
 ﻿using UnityEngine;
 using Unity.Netcode;
 
-/// <summary>
-/// UNIVERSAL MULTIPLAYER BULLET
-/// Works for BOTH players - automatically detects enemies
-/// Path: Assets/Scripts/Multiplayer/NetworkBullet.cs
-/// 
-/// SETUP:
-/// 1. Create ONE bullet prefab
-/// 2. Attach this script
-/// 3. Add NetworkObject component
-/// 4. Add to NetworkManager Prefabs List
-/// 5. Assign to BOTH player prefabs (same bullet for everyone!)
-/// </summary>
 public class NetworkBullet : NetworkBehaviour
 {
     [SerializeField] private float speed = 10f;
@@ -23,69 +11,99 @@ public class NetworkBullet : NetworkBehaviour
     [SerializeField] private ParticleSystem hitParticleSystem;
     [SerializeField] private ParticleSystem wallHitParticleSystem;
 
-    // Who shot this bullet?
-    private NetworkVariable<ulong> shooterClientId = new NetworkVariable<ulong>();
+    private NetworkVariable<ulong> netShooterId = new NetworkVariable<ulong>(
+        ulong.MaxValue,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server
+    );
 
-    // Bullet movement direction
-    private Vector2 moveDirection = Vector2.right;
+    private NetworkVariable<Vector2> netMoveDirection = new NetworkVariable<Vector2>(
+        Vector2.right,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server
+    );
 
-    public void Initialize(ulong shooterId, Vector2 direction)
+    private ulong shooterOwnerId = ulong.MaxValue;
+    private Vector2 localMoveDirection = Vector2.right;
+    private Collider2D shooterColliderToIgnore = null;
+
+    private bool isDestroyed = false;
+    private Collider2D bulletCollider;
+
+    private void Awake()
     {
+        bulletCollider = GetComponent<Collider2D>();
+    }
+
+    public void Initialize(ulong shooterId, Vector2 direction, Collider2D shooterCollider = null)
+    {
+        shooterOwnerId = shooterId;
+        localMoveDirection = direction.normalized;
+        shooterColliderToIgnore = shooterCollider;
+
+        Debug.Log($"🔫 Bullet pre-init → shooter={shooterId}, dir={direction}");
+    }
+
+    public override void OnNetworkSpawn()
+    {
+        base.OnNetworkSpawn();
+
         if (IsServer)
         {
-            shooterClientId.Value = shooterId;
-            moveDirection = direction.normalized;
+            netShooterId.Value = shooterOwnerId;
+            netMoveDirection.Value = localMoveDirection;
+
+            if (shooterColliderToIgnore != null && bulletCollider != null)
+            {
+                Physics2D.IgnoreCollision(bulletCollider, shooterColliderToIgnore, true);
+                Debug.Log($"Server: Physics2D ignoring shooter collider ({shooterOwnerId})");
+            }
         }
     }
 
     protected virtual void Update()
     {
-        // Only server moves bullets
-        if (!IsServer) return;
+        if (isDestroyed) return;
 
-        transform.Translate(moveDirection * speed * Time.deltaTime);
+        transform.Translate(netMoveDirection.Value * speed * Time.deltaTime, Space.World);
     }
 
     private void OnCollisionEnter2D(Collision2D collision)
     {
-        // Only server handles collision
         if (!IsServer) return;
+        if (isDestroyed) return;
 
-        // Check if hit a player
-        var hitGun = collision.gameObject.GetComponent<NetworkPlayerController>();
-        if (hitGun != null)
+        var hitPlayer = collision.gameObject.GetComponent<NetworkPlayerController>();
+
+        if (hitPlayer != null)
         {
-            // Is this our own bullet? Don't damage ourselves!
-            if (hitGun.OwnerClientId == shooterClientId.Value)
+            ulong currentShooterId = netShooterId.Value;
+
+            Debug.Log($"Collision: bullet owner={currentShooterId}, hit player={hitPlayer.OwnerClientId}");
+
+            if (hitPlayer.OwnerClientId == currentShooterId)
             {
-                Debug.Log("⚠️ Hit own bullet - ignoring");
+                Debug.Log($"Self-hit ignored: {currentShooterId}");
                 return;
             }
 
-            // Hit enemy player!
-            Debug.Log($"💥 Bullet from {shooterClientId.Value} hit enemy {hitGun.OwnerClientId}");
-
+            Debug.Log($"HIT! {currentShooterId} → {hitPlayer.OwnerClientId}, damage={damage}");
+            hitPlayer.TakeDamage(damage);
             TriggerSlowMotionClientRpc(0.3f);
-
-            if (hitParticleSystem != null)
-                PlayHitParticleClientRpc();
-
-            hitGun.TakeDamage(damage);
+            if (hitParticleSystem != null) PlayHitParticleClientRpc();
             DestroyBulletClientRpc();
         }
         else if (collision.gameObject.CompareTag("Wall"))
         {
+            Debug.Log("Bullet hit wall");
             PlayWallHitParticleClientRpc();
             DestroyBulletClientRpc();
         }
         else if (collision.gameObject.CompareTag("Bullet"))
         {
-            // Bullet vs bullet collision
+            Debug.Log("Bullet vs Bullet!");
             TriggerSlowMotionClientRpc(0.5f);
-
-            if (hitParticleSystem != null)
-                PlayHitParticleClientRpc();
-
+            if (hitParticleSystem != null) PlayHitParticleClientRpc();
             DestroyBulletClientRpc();
         }
     }
@@ -100,30 +118,21 @@ public class NetworkBullet : NetworkBehaviour
     [ClientRpc]
     private void PlayHitParticleClientRpc()
     {
-        if (hitParticleSystem != null)
-            hitParticleSystem.Play();
+        if (hitParticleSystem != null) hitParticleSystem.Play();
     }
 
     [ClientRpc]
     private void PlayWallHitParticleClientRpc()
     {
-        if (wallHitParticleSystem != null)
-            wallHitParticleSystem.Play();
+        if (wallHitParticleSystem != null) wallHitParticleSystem.Play();
     }
 
     [ClientRpc]
     private void DestroyBulletClientRpc()
     {
-        if (bulletVisual != null)
-            bulletVisual.SetActive(false);
-
-        var collider = GetComponent<BoxCollider2D>();
-        if (collider != null)
-            collider.enabled = false;
-
-        if (IsServer)
-        {
-            Destroy(gameObject, 0.15f);
-        }
+        isDestroyed = true;
+        if (bulletVisual != null) bulletVisual.SetActive(false);
+        if (bulletCollider != null) bulletCollider.enabled = false;
+        if (IsServer) Destroy(gameObject, 0.15f);
     }
 }
